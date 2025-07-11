@@ -1,0 +1,11 @@
+./test_fix_proto_syntax
+user
+user.proto
+y
+y
+y
+y
+y
+y
+y
+y

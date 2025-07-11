@@ -1,0 +1,155 @@
+# goctl 自定义模板配置
+# 用于生成分层架构的 RPC 服务
+
+# 模板变量定义
+variables:
+  package: "{{.package}}"
+  pbImport: "{{.pbImport}}"
+  pbPackage: "{{.pbPackage}}"
+  method: "{{.method}}"
+  request: "{{.request}}"
+  response: "{{.response}}"
+  serviceName: "{{.serviceName}}"
+  repoName: "{{.repoName}}"
+  model: "{{.model}}"
+  table: "{{.table}}"
+  comment: "{{.comment}}"
+  fields: "{{.fields}}"
+  port: "{{.port}}"
+
+# 文件生成规则
+files:
+  # Logic 层（增强版本）
+  - path: "internal/logic/{{.method}}logic.go"
+    template: "internal/logic/logic.tpl"
+
+  # Logic 测试
+  - path: "internal/logic/{{.method}}logic_test.go"
+    template: "internal/logic/logic_test.tpl"
+
+  # Service 层
+  - path: "internal/service/{{.serviceName}}service.go"
+    template: "internal/service/service.go.tpl"
+
+  # Service 测试
+  - path: "internal/service/{{.serviceName}}service_test.go"
+    template: "internal/service/service_test.tpl"
+
+  # Repository 层
+  - path: "internal/repository/{{.repoName}}repository.go"
+    template: "internal/repository/repository.go.tpl"
+
+  # Repository 测试
+  - path: "internal/repository/{{.repoName}}repository_test.go"
+    template: "internal/repository/repository_test.tpl"
+
+  # Model 层
+  - path: "internal/model/{{.model}}.go"
+    template: "internal/model/model.go.tpl"
+
+  # Model 测试
+  - path: "internal/model/{{.model}}_test.go"
+    template: "internal/model/model_test.tpl"
+
+  # ServiceContext
+  - path: "internal/svc/servicecontext.go"
+    template: "internal/svc/servicecontext.tpl"
+
+  # 配置文件
+  - path: "etc/{{.serviceName}}.yaml"
+    template: "etc.tpl"
+
+  # 工具类
+  - path: "internal/util/errcode.go"
+    template: "util/errcode.tpl"
+
+  # 中间件
+  - path: "internal/middleware/middleware.go"
+    template: "internal/middleware/middleware.tpl"
+
+  # 常量定义
+  - path: "internal/constants/constants.go"
+    template: "internal/constants/constants.tpl"
+
+  # 工具函数
+  - path: "internal/util/utils.go"
+    template: "internal/util/utils.tpl"
+
+# 目录结构
+directories:
+  - "internal/logic"
+  - "internal/service"
+  - "internal/repository"
+  - "internal/model"
+  - "internal/svc"
+  - "internal/types"
+  - "internal/util"
+  - "internal/middleware"
+  - "internal/constants"
+  - "internal/config"
+  - "etc"
+  - "docs"
+  - "scripts"
+
+# 依赖注入配置
+dependencies:
+  - "github.com/zeromicro/go-zero/core/logx"
+  - "github.com/zeromicro/go-zero/core/stores/redis"
+  - "github.com/zeromicro/go-zero/core/trace"
+  - "github.com/stretchr/testify/assert"
+  - "github.com/stretchr/testify/mock"
+  - "gorm.io/gorm"
+  - "gorm.io/driver/mysql"
+  - "gorm.io/gorm/logger"
+  - "google.golang.org/grpc/codes"
+  - "google.golang.org/grpc/status"
+  - "{{.pbImport}}"
+  - "{{.package}}/internal/util"
+  - "{{.package}}/internal/config"
+
+# 代码生成规则
+rules:
+  # 命名规范
+  naming:
+    logic: "{{.method}}Logic"
+    service: "{{.serviceName}}Service"
+    repository: "{{.repoName}}Repository"
+    model: "{{.model}}"
+
+  # 文件命名规范
+  fileNaming:
+    logic: "{{.method}}logic.go"
+    service: "{{.serviceName}}service.go"
+    repository: "{{.repoName}}repository.go"
+    model: "{{.model}}.go"
+
+  # 测试文件命名规范
+  testNaming:
+    logic: "{{.method}}logic_test.go"
+    service: "{{.serviceName}}service_test.go"
+    repository: "{{.repoName}}repository_test.go"
+    model: "{{.model}}_test.go"
+
+# 代码质量配置
+quality:
+  # 代码格式化
+  format: true
+  # 代码检查
+  lint: true
+  # 测试覆盖率
+  coverage: 80
+  # 性能基准测试
+  benchmark: true
+
+# 架构说明
+architecture:
+  description: "移除Handler层的架构：Logic -> Service -> Repository -> Model"
+  layers:
+    - name: "Logic"
+      description: "请求入口、参数验证、权限验证、业务逻辑、调用Service层"
+    - name: "Service"
+      description: "业务服务、事务管理"
+    - name: "Repository"
+      description: "数据访问、缓存处理"
+    - name: "Model"
+      description: "数据模型、验证"

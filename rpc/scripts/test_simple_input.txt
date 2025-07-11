@@ -1,0 +1,12 @@
+./test_simple_proto
+user
+user.proto
+github.com/example/user/types
+y
+y
+y
+y
+y
+y
+y
+y
