@@ -262,6 +262,52 @@ if err != nil {
 l.Infof("处理用户请求: userId=%s, action=%s", userId, action)
 ```
 
+## 使用 GitHub 模板
+
+### 基本用法
+
+```bash
+# 使用 GitHub URL 生成 API 服务
+goctl api go -api user.api -dir . --style goZero --home https://github.com/username/repo
+
+# 使用 GitHub URL 生成 RPC 服务
+goctl rpc protoc user.proto --go_out=./types --go-grpc_out=./types --zrpc_out=. --style goZero --home https://github.com/username/repo
+
+# 使用 GitHub URL 生成数据模型
+goctl model mysql datasource -t user -c -d --home https://github.com/username/repo
+```
+
+### 支持的 URL 格式
+
+- **GitHub 仓库**: `https://github.com/username/repo`
+- **特定分支**: `https://github.com/username/repo/tree/feature-branch`
+- **特定标签**: `https://github.com/username/repo/tree/v1.0.0`
+- **Raw 内容**: `https://raw.githubusercontent.com/username/repo/main`
+
+### 高级用法
+
+```bash
+# 克隆到本地使用
+git clone https://github.com/username/repo ./templates
+goctl api go -api user.api -dir . --style goZero --home ./templates
+
+# 使用环境变量
+export GOTEMPLATE_HOME="https://github.com/username/repo"
+goctl api go -api user.api -dir . --style goZero --home $GOTEMPLATE_HOME
+```
+
+### 验证模板
+
+```bash
+# 检查模板可用性
+curl -s --head https://github.com/username/repo | head -n 1
+
+# 使用验证脚本
+./scripts/use_github_template.sh
+```
+
+详细说明请参考：[简化使用指南](SIMPLE_USAGE.md)、[详细使用指南](GITHUB_TEMPLATE_USAGE.md) 和 [快速参考](QUICK_REFERENCE.md)
+
 ## 注意事项
 
 1. **模板路径**: 确保使用正确的 `--home` 参数指向模板目录
@@ -271,6 +317,7 @@ l.Infof("处理用户请求: userId=%s, action=%s", userId, action)
 5. **代码审查**: 生成代码后需要进行代码审查和测试
 6. **分层调用**: 严格遵循分层调用规则，避免跨层调用
 7. **RPC 服务**: 使用 `generate_layered_rpc.sh` 脚本生成完整的分层架构
+8. **GitHub 模板**: 确保 GitHub 仓库包含正确的模板目录结构
 
 ## 问题解决
 

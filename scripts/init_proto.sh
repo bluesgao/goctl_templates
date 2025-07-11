@@ -181,155 +181,19 @@ collect_advanced_options() {
 }
 
 # =============================================================================
-# 修复功能函数
+# 内容处理函数
 # =============================================================================
-
-# 修复 protobuf 导入问题
-fix_protobuf_imports() {
-    print_info "开始修复 protobuf 导入问题..."
-    
-    # 检查 protoc 是否安装
-    if ! command -v protoc &> /dev/null; then
-        print_error "protoc 未安装，请先安装 protoc"
-        print_info "安装方法："
-        print_info "  macOS: brew install protobuf"
-        print_info "  Ubuntu: sudo apt-get install protobuf-compiler"
-        print_info "  CentOS: sudo yum install protoc"
-        return 1
-    fi
-    
-    # 获取 protoc 的包含路径
-    local protoc_include_path=$(protoc --print_free_field_numbers 2>&1 | grep "include" | head -1 | awk '{print $2}' 2>/dev/null || echo "/usr/local/include")
-    if [ -z "$protoc_include_path" ]; then
-        # 尝试常见的安装路径
-        protoc_include_path="/usr/local/include"
-        if [ ! -d "$protoc_include_path/google/protobuf" ]; then
-            protoc_include_path="/usr/include"
-        fi
-    fi
-    
-    print_info "protoc 包含路径: $protoc_include_path"
-    
-    # 检查 Google protobuf 文件是否存在
-    if [ ! -f "$protoc_include_path/google/protobuf/timestamp.proto" ]; then
-        print_warn "Google protobuf 文件不存在，尝试下载..."
-        
-        # 创建临时目录
-        local temp_dir=$(mktemp -d)
-        cd "$temp_dir"
-        
-        # 下载 protobuf 源码
-        print_info "下载 protobuf 源码..."
-        if command -v git &> /dev/null; then
-            git clone --depth 1 https://github.com/protocolbuffers/protobuf.git
-            cd protobuf/src/google/protobuf
-            
-            # 复制文件到系统目录
-            if [ -w "$protoc_include_path" ]; then
-                sudo mkdir -p "$protoc_include_path/google/protobuf"
-                sudo cp *.proto "$protoc_include_path/google/protobuf/"
-                print_info "已复制 Google protobuf 文件到 $protoc_include_path/google/protobuf/"
-            else
-                print_warn "无法写入系统目录，请手动复制文件"
-                print_info "请将以下文件复制到 $protoc_include_path/google/protobuf/："
-                ls -la *.proto
-            fi
-        else
-            print_error "git 未安装，无法下载 protobuf 源码"
-            print_info "请手动下载并安装 protobuf"
-        fi
-        
-        # 清理临时目录
-        cd - > /dev/null
-        rm -rf "$temp_dir"
-    else
-        print_info "Google protobuf 文件已存在"
-    fi
-    
-    # 检查 Go 插件是否安装
-    print_info "检查 Go protobuf 插件..."
-    
-    if ! command -v protoc-gen-go &> /dev/null; then
-        print_warn "安装 protoc-gen-go..."
-        go install google.golang.org/protobuf/cmd/protoc-gen-go@latest
-    else
-        print_info "protoc-gen-go 已安装"
-    fi
-    
-    if ! command -v protoc-gen-go-grpc &> /dev/null; then
-        print_warn "安装 protoc-gen-go-grpc..."
-        go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@latest
-    else
-        print_info "protoc-gen-go-grpc 已安装"
-    fi
-    
-    # 测试编译
-    print_info "测试编译..."
-    local test_proto="test_fix.proto"
-    
-    cat > "$test_proto" << 'EOF'
-syntax = "proto3";
-
-package test;
-
-option go_package = ".";
-
-import "google/protobuf/timestamp.proto";
-import "google/protobuf/empty.proto";
-
-message TestMessage {
-  string name = 1;
-  google.protobuf.Timestamp created_at = 2;
-}
-
-service TestService {
-  rpc Test(google.protobuf.Empty) returns (TestMessage);
-}
-EOF
-    
-    if protoc --go_out=. --go-grpc_out=. "$test_proto" 2>/dev/null; then
-        print_info "✅ 编译成功！protobuf 导入问题已修复"
-        rm -f "$test_proto" test.pb.go test_grpc.pb.go
-        return 0
-    else
-        print_error "❌ 编译失败，请检查 protobuf 安装"
-        rm -f "$test_proto" test.pb.go test_grpc.pb.go
-        return 1
-    fi
-}
 
 # 处理导入语句
 handle_imports() {
     local imports=""
     
     if [ "$INCLUDE_IMPORTS" = "true" ]; then
-        # 检查 Google protobuf 文件是否存在（先检查系统目录，再检查用户目录）
-        local protoc_include_path=$(protoc --print_free_field_numbers 2>&1 | grep "include" | head -1 | awk '{print $2}' 2>/dev/null || echo "/usr/local/include")
-        local user_include_path="$HOME/.local/include"
-        local timestamp_file=""
-        
-        # 按优先级检查文件位置
-        if [ -f "$protoc_include_path/google/protobuf/timestamp.proto" ]; then
-            timestamp_file="$protoc_include_path/google/protobuf/timestamp.proto"
-        elif [ -f "$user_include_path/google/protobuf/timestamp.proto" ]; then
-            timestamp_file="$user_include_path/google/protobuf/timestamp.proto"
-        fi
-        
-        if [ -n "$timestamp_file" ]; then
-            imports="import \"google/protobuf/timestamp.proto\";
+        imports="import \"google/protobuf/timestamp.proto\";
 import \"google/protobuf/empty.proto\";
 "
-        else
-            # 不输出任何信息，避免污染 proto 文件
-            INCLUDE_IMPORTS="false"
-            # 提示用户安装 Google protobuf 文件
-            print_warn "Google protobuf 文件不存在，将使用字符串格式的时间戳"
-            print_info "如需使用 google.protobuf.Timestamp，请运行："
-            print_info "  ./install_google_protobuf.sh"
-        fi
     fi
     
-    # 确保返回有效的字符串，避免语法错误
     echo "${imports:-}"
 }
 
@@ -395,21 +259,9 @@ EOF
 # 生成请求响应消息
 generate_request_response_messages() {
     if [ "$INCLUDE_SERVICE_METHODS" = "true" ]; then
-        # 根据是否包含 Google protobuf 导入来决定时间戳格式
+        # 根据用户选择决定时间戳格式
         local timestamp_field
-        # 检查 Google protobuf 文件是否存在（先检查系统目录，再检查用户目录）
-        local protoc_include_path=$(protoc --print_free_field_numbers 2>&1 | grep "include" | head -1 | awk '{print $2}' 2>/dev/null || echo "/usr/local/include")
-        local user_include_path="$HOME/.local/include"
-        local timestamp_file=""
-        
-        # 按优先级检查文件位置
-        if [ -f "$protoc_include_path/google/protobuf/timestamp.proto" ]; then
-            timestamp_file="$protoc_include_path/google/protobuf/timestamp.proto"
-        elif [ -f "$user_include_path/google/protobuf/timestamp.proto" ]; then
-            timestamp_file="$user_include_path/google/protobuf/timestamp.proto"
-        fi
-        
-        if [ "$INCLUDE_IMPORTS" = "true" ] && [ -n "$timestamp_file" ]; then
+        if [ "$INCLUDE_IMPORTS" = "true" ]; then
             timestamp_field="  google.protobuf.Timestamp timestamp = 3;  // 当前时间"
         else
             timestamp_field="  string timestamp = 3;     // 当前时间（字符串格式）"
@@ -510,9 +362,6 @@ ${PROTO_FILE}
 │   ├── PageRequest         # 分页请求
 │   ├── PageResponse        # 分页响应
 │   ├── Sort               # 排序参数
-│   ├── BaseEntity         # 基础实体信息
-│   ├── FileInfo           # 文件信息
-│   └── UserInfo           # 用户信息
 ├── 服务定义
 │   └── ${SERVICE_NAME}Service  # ${SERVICE_NAME} 服务
 └── 请求响应消息
@@ -531,15 +380,6 @@ ${PROTO_FILE}
 
 ### PageRequest/PageResponse
 分页请求和响应，支持页码、大小、关键词搜索、过滤条件和排序。
-
-### BaseEntity
-基础实体信息，包含 ID、名称、描述、创建时间和更新时间。
-
-### FileInfo
-文件信息，包含文件名、路径、大小、MIME类型和创建时间。
-
-### UserInfo
-用户信息，包含用户ID、用户名、邮箱、手机号、头像、状态和时间戳。
 
 ## 使用方法
 
@@ -563,8 +403,7 @@ goctl rpc protoc ${PROTO_FILE} --go_out=./types --go-grpc_out=./types --zrpc_out
 2. 确保已安装 Go protobuf 插件
 3. 根据实际业务需求修改消息定义
 4. 添加适当的字段验证和错误处理
-5. 脚本会自动检测并修复 Google protobuf 导入问题
-6. 如果修复失败，会自动使用字符串格式的时间戳
+5. 如需使用 Google protobuf 类型，请确保相关文件已正确安装
 EOF
     fi
 }
@@ -596,12 +435,11 @@ create_files() {
     # 生成 proto 文件
     print_info "步骤 1: 生成 Proto 文件..."
     
-    # 只屏蔽错误输出，保留内容输出
-    local imports=$(handle_imports 2>/dev/null)
-    local common_messages=$(generate_common_messages 2>/dev/null)
-    local service_methods=$(generate_service_methods 2>/dev/null)
-    local request_response_messages=$(generate_request_response_messages 2>/dev/null)
-    local comments=$(generate_comments 2>/dev/null)
+    local imports=$(handle_imports)
+    local common_messages=$(generate_common_messages)
+    local service_methods=$(generate_service_methods)
+    local request_response_messages=$(generate_request_response_messages)
+    local comments=$(generate_comments)
     
     generate_proto_file "$imports" "$common_messages" "$service_methods" "$request_response_messages" "$comments"
     
@@ -636,7 +474,7 @@ show_results() {
     if [ "$INCLUDE_IMPORTS" = "true" ]; then
         print_info "已包含常用导入语句（Google protobuf）"
     else
-        print_warn "未包含 Google protobuf 导入，使用字符串格式的时间戳"
+        print_info "未包含 Google protobuf 导入"
     fi
 
     print_info "Proto 文件创建完成！"
