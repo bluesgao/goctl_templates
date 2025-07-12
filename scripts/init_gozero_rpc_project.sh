@@ -6,8 +6,9 @@
 set -e
 
 # 全局变量
-PROTO_FILE="user.proto"
-PROJECT_DIR="./user"
+PROTO_FILE=""
+PROJECT_DIR=""
+PROJECT_NAME=""
 
 # 颜色定义
 RED='\033[0;31m'
@@ -30,6 +31,51 @@ print_warn() {
 
 print_error() {
     echo -e "${RED}[ERROR]${NC} $1"
+}
+
+# =============================================================================
+# 交互式输入函数
+# =============================================================================
+
+# 获取用户输入
+get_user_input() {
+    print_info "开始交互式配置..."
+    
+    # 获取项目名称
+    while [ -z "$PROJECT_NAME" ]; do
+        read -p "请输入项目名称 (默认: user): " input
+        PROJECT_NAME=${input:-user}
+        if [ -z "$PROJECT_NAME" ]; then
+            print_error "项目名称不能为空"
+        fi
+    done
+    
+    # 获取 proto 文件名
+    while [ -z "$PROTO_FILE" ]; do
+        read -p "请输入 proto 文件名 (默认: ${PROJECT_NAME}.proto): " input
+        PROTO_FILE=${input:-${PROJECT_NAME}.proto}
+        if [ -z "$PROTO_FILE" ]; then
+            print_error "Proto 文件名不能为空"
+        fi
+    done
+    
+    # 设置项目目录
+    PROJECT_DIR="./${PROJECT_NAME}"
+    
+    print_info "配置信息："
+    print_info "  项目名称: $PROJECT_NAME"
+    print_info "  项目目录: $PROJECT_DIR"
+    print_info "  Proto 文件: $PROTO_FILE"
+    
+    # 确认配置
+    read -p "确认使用以上配置？(y/N): " confirm
+    if [[ ! "$confirm" =~ ^[Yy]$ ]]; then
+        print_info "重新配置..."
+        PROJECT_NAME=""
+        PROTO_FILE=""
+        PROJECT_DIR=""
+        get_user_input
+    fi
 }
 
 # =============================================================================
@@ -72,24 +118,7 @@ validate_dependencies() {
     print_info "依赖验证通过"
 }
 
-# 验证项目结构
-validate_project_structure() {
-    print_info "验证项目结构..."
 
-    if [ ! -d "$PROJECT_DIR" ]; then
-        print_error "项目目录不存在: $PROJECT_DIR"
-        print_info "请先运行 init_project.sh 初始化项目"
-        exit 1
-    fi
-
-    if [ ! -f "$PROJECT_DIR/$PROTO_FILE" ]; then
-        print_error "Proto 文件不存在: $PROJECT_DIR/$PROTO_FILE"
-        print_info "请先运行 init_proto.sh 创建 proto 文件"
-        exit 1
-    fi
-
-    print_info "项目结构验证通过"
-}
 
 # =============================================================================
 # 代码生成函数
@@ -99,12 +128,46 @@ validate_project_structure() {
 generate_code() {
     print_info "开始生成代码..."
 
+    # 检查项目目录是否存在，如果不存在则创建
+    if [ ! -d "$PROJECT_DIR" ]; then
+        print_info "创建项目目录: $PROJECT_DIR"
+        mkdir -p "$PROJECT_DIR"
+    fi
+
     # 切换到项目目录
     cd "$PROJECT_DIR"
 
     # 构建 goctl 命令
     local cmd="goctl rpc protoc $PROTO_FILE"
     cmd="$cmd --proto_path=."
+    
+    # 如果 proto 文件不存在，创建一个基础的 proto 文件
+    if [ ! -f "$PROTO_FILE" ]; then
+        print_info "创建基础 proto 文件: $PROTO_FILE"
+        cat > "$PROTO_FILE" << EOF
+syntax = "proto3";
+
+package ${PROJECT_NAME};
+
+option go_package = "./${PROJECT_NAME}";
+
+// ${PROJECT_NAME} 服务定义
+service ${PROJECT_NAME} {
+  // 示例方法
+  rpc Hello(HelloRequest) returns (HelloResponse);
+}
+
+// 请求消息
+message HelloRequest {
+  string name = 1;
+}
+
+// 响应消息
+message HelloResponse {
+  string message = 1;
+}
+EOF
+    fi
 
     # 添加 Google protobuf 路径
     local user_include_path="$HOME/.local/include"
@@ -126,7 +189,7 @@ generate_code() {
     cmd="$cmd --go-grpc_out=."
     cmd="$cmd --zrpc_out=."
     cmd="$cmd --style=go_zero"
-    cmd="$cmd --home=--home https://github.com/username/repo/tree/v1.0.0"
+    cmd="$cmd --home=https://github.com/bluesgao/goctl_templates.git"
     print_info "执行命令: $cmd"
 
     # 执行命令
@@ -193,11 +256,9 @@ show_results() {
 
 main() {
     print_info "开始初始化 go-zero RPC 项目..."
-    print_info "项目目录: $PROJECT_DIR"
-    print_info "Proto 文件: $PROTO_FILE"
-
+    
+    get_user_input
     validate_dependencies
-    validate_project_structure
     generate_code
     show_results
 }
