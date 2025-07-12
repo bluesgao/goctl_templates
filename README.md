@@ -1,143 +1,87 @@
-# goctl 自定义模板 - 分层架构
+# 🚀 goctl RPC 服务 - 分层架构
 
-本目录包含 goctl 的自定义模板文件，采用分层架构设计：**Logic -> Service -> Repository -> Model**
+> 基于 go-zero 框架的 RPC 服务分层架构模板，采用 **Logic → Service → Repository → Model** 设计模式
 
-## 分层架构设计
+## 🏗️ 分层架构设计
 
 ```
 ┌─────────────────┐
-│     Handler     │  ← 请求处理层（参数验证、响应格式化）
+│     Logic       │  ← 业务编排层（gRPC 请求处理、错误处理、日志记录）
 ├─────────────────┤
-│     Logic       │  ← 业务编排层（调用 Service、错误处理）
+│    Service      │  ← 业务逻辑层（业务规则验证、数据转换、核心业务逻辑）
 ├─────────────────┤
-│    Service      │  ← 业务逻辑层（业务规则、数据转换）
+│  Repository     │  ← 数据访问层（数据库操作、缓存处理、数据转换）
 ├─────────────────┤
-│  Repository     │  ← 数据访问层（数据库操作、缓存）
-├─────────────────┤
-│     Model       │  ← 数据模型层（数据结构、ORM 映射）
+│     Model       │  ← 数据模型层（数据结构定义、ORM 映射、数据验证）
 └─────────────────┘
 ```
 
-## 目录结构
+## 🎯 分层职责
 
-```
-templates/
-├── api/                    # API 服务模板
-│   ├── handler.tpl        # 处理器模板
-│   ├── logic.tpl          # 业务编排层模板
-│   ├── service.tpl        # 业务逻辑层模板
-│   ├── repository.tpl     # 数据访问层模板
-│   ├── svc.tpl            # 服务上下文模板
-│   ├── types.tpl          # 类型定义模板
-│   └── model.tpl          # 数据模型模板
-├── rpc/                    # RPC 服务模板
-│   ├── internal/
-│   │   ├── handler/
-│   │   │   └── handler.tpl
-│   │   ├── logic/
-│   │   │   └── logic.tpl
-│   │   ├── service/
-│   │   │   └── service.go.tpl
-│   │   ├── repository/
-│   │   │   └── repository.go.tpl
-│   │   ├── model/
-│   │   │   └── model.go.tpl
-│   │   ├── svc/
-│   │   │   └── servicecontext.tpl
-│   │   └── types/
-│   │       └── types.tpl
-│   ├── etc.tpl            # 配置文件模板
-│   ├── goctl.yaml         # goctl 配置文件
-│   ├── generate_layered_rpc.sh  # 分层架构生成脚本
-│   ├── test_example.sh    # 测试示例脚本
-│   └── USAGE.md           # 使用说明文档
-├── model/                  # 数据模型模板
-│   └── model.tpl          # 模型模板
-├── util/                   # 工具类模板
-│   └── errcode.tpl        # 错误码模板
-└── example/                # 使用示例
-    ├── README.md          # 完整使用指南
-    └── layered_architecture.md  # 分层架构详细示例
-```
+### 1. 🧠 Logic 层（业务编排层）
 
-## 分层职责
-
-### 1. Handler 层（请求处理层）
-
-- **职责**: 参数验证、请求解析、响应格式化
-- **特点**: 轻量级，只负责 HTTP/gRPC 层面的处理
-- **依赖**: Logic 层
-
-### 2. Logic 层（业务编排层）
-
-- **职责**: 业务流程编排、错误处理、日志记录
-- **特点**: 协调各个 Service 的调用
+- **职责**: gRPC 请求处理、业务流程编排、错误处理、日志记录
+- **特点**: 协调各个 Service 的调用，处理请求参数验证和响应格式化
 - **依赖**: Service 层
 
-### 3. Service 层（业务逻辑层）
+### 2. ⚙️ Service 层（业务逻辑层）
 
-- **职责**: 业务规则验证、数据转换、业务逻辑处理
-- **特点**: 包含核心业务逻辑，不直接操作数据库
+- **职责**: 业务规则验证、数据转换、核心业务逻辑处理
+- **特点**: 包含核心业务逻辑，不直接操作数据库，可被多个 Logic 调用
 - **依赖**: Repository 层
 
-### 4. Repository 层（数据访问层）
+### 3. 🗄️ Repository 层（数据访问层）
 
-- **职责**: 数据库操作、缓存处理、数据转换
-- **特点**: 封装所有数据访问逻辑，提供统一接口
+- **职责**: 数据库操作、缓存处理、数据转换、数据访问封装
+- **特点**: 封装所有数据访问逻辑，提供统一接口，可被多个 Service 调用
 - **依赖**: Model 层
 
-### 5. Model 层（数据模型层）
+### 4. 📊 Model 层（数据模型层）
 
-- **职责**: 数据结构定义、ORM 映射、数据验证
-- **特点**: 纯数据结构，不包含业务逻辑
+- **职责**: 数据结构定义、ORM 映射、数据验证、表结构定义
+- **特点**: 纯数据结构，不包含业务逻辑，支持 GORM 标签
 - **依赖**: 无
 
-## 使用方法
+## 📖 使用方法
 
-### 1. 使用自定义脚本生成 RPC 服务（推荐）
-
-由于标准的 goctl 模板只会生成 handler 和 logic 文件，我们提供了自定义脚本 `generate_layered_rpc.sh` 来生成完整的分层架构。
+#### 步骤 1: 生成默认 proto 文件
 
 ```bash
-# 基本用法
-./templates/rpc/generate_layered_rpc.sh <proto_file> <output_dir>
-
-# 完整用法
-./templates/rpc/generate_layered_rpc.sh <proto_file> <output_dir> <service_name> <repo_name> <model_name>
-
-# 示例
-./templates/rpc/generate_layered_rpc.sh user.proto ./user user UserRepo User
+./scripts/init_proto.sh
+# 输入服务名称: UserService
+# 输入 proto 文件名: user.proto
+# 输入包名: user
 ```
 
-#### 脚本功能
-
-1. **生成基础 RPC 结构** - 使用 goctl 生成标准的 handler 和 logic
-2. **创建分层目录** - 自动创建 service、repository、model 目录
-3. **生成 Service 层** - 创建业务逻辑层代码
-4. **生成 Repository 层** - 创建数据访问层代码
-5. **生成 Model 层** - 创建数据模型层代码
-6. **生成工具类** - 创建错误处理等工具类
-7. **更新 ServiceContext** - 配置依赖注入
-8. **生成文档** - 创建 README 说明文档
-
-### 2. 测试脚本功能
+#### 步骤 2: 生成默认项目骨架
 
 ```bash
-# 运行测试示例
-./templates/rpc/test_example.sh
+./scripts/init_rpc_project.sh
+# 输入项目名称: user-service
+# 输入服务名称: UserService
+# 输入仓库名称: UserRepo
+# 输入模型名称: User
 ```
 
-### 3. 使用自定义模板生成 API 服务
+#### 步骤 3: 生成 Repository 和 Model
 
 ```bash
-# 创建新的 API 服务
-goctl api new apigateway --home ./templates
-
-# 生成 API 代码
-goctl api go -api apigateway.api -dir . --style goZero --home ./templates
+./scripts/init_repo.sh
+# 输入项目目录: ./user-service
+# 输入仓库名称: UserRepo
+# 输入模型名称: User
 ```
 
-### 4. 使用自定义模板生成数据模型
+#### 步骤 4: 生成业务 Service
+
+```bash
+./scripts/init_service.sh
+# 输入项目目录: ./user-service
+# 输入服务名称: UserService
+# 输入 Repository 依赖: UserRepo
+```
+
+### 📊 生成数据模型
 
 ```bash
 # 生成单个表的模型
@@ -147,215 +91,90 @@ goctl model mysql datasource -t user -c -d --home ./templates
 goctl model mysql datasource -t "user,merchant,order" -c -d --home ./templates
 ```
 
-## 模板变量说明
+## 🔧 脚本工具
 
-### 通用变量
+### 📝 init_proto.sh - Proto 文件初始化脚本
 
-- `{{.package}}` - 包名
-- `{{.imports}}` - 导入语句
-- `{{.comment}}` - 注释
-
-### RPC 服务变量
-
-- `{{.pbImport}}` - protobuf 导入路径
-- `{{.pbPackage}}` - protobuf 包名
-- `{{.method}}` - 方法名
-- `{{.request}}` - 请求类型
-- `{{.response}}` - 响应类型
-- `{{.serviceName}}` - 服务名
-- `{{.repoName}}` - 仓库名
-
-### API 服务变量
-
-- `{{.method}}` - 方法名
-- `{{.request}}` - 请求类型
-- `{{.response}}` - 响应类型
-- `{{.serviceName}}` - 服务名
-- `{{.repoName}}` - 仓库名
-
-### 数据模型变量
-
-- `{{.model}}` - 模型名
-- `{{.table}}` - 表名
-- `{{.comment}}` - 注释
-- `{{.fields}}` - 字段列表
-
-## 分层架构优势
-
-### 1. 职责分离
-
-- 每一层都有明确的职责
-- 降低代码耦合度
-- 提高代码可维护性
-
-### 2. 可测试性
-
-- 每一层都可以独立测试
-- 便于单元测试和集成测试
-- 提高代码质量
-
-### 3. 可扩展性
-
-- 易于添加新功能
-- 便于重构和优化
-- 支持团队协作开发
-
-### 4. 代码复用
-
-- Service 层可以被多个 Logic 调用
-- Repository 层可以被多个 Service 调用
-- 减少重复代码
-
-## 自定义规范
-
-1. **错误处理**: 统一使用 `util.NewError()` 返回错误
-2. **日志记录**: 使用 `logx.WithContext(ctx)` 记录日志
-3. **参数验证**: 在 Handler 层进行参数验证
-4. **业务逻辑**: 在 Service 层实现具体业务逻辑
-5. **数据访问**: 在 Repository 层进行数据库操作
-6. **数据模型**: 在 Model 层定义数据结构
-
-## 最佳实践
-
-### 1. 依赖注入
-
-```go
-// 在 ServiceContext 中注入依赖
-type ServiceContext struct {
-    Config config.Config
-    DB     *gorm.DB
-    Redis  redis.Redis
-  
-    // Repository 层
-    UserRepo repository.UserRepository
-  
-    // Service 层
-    UserService *service.UserService
-}
-```
-
-### 2. 接口定义
-
-```go
-// 定义 Repository 接口
-type UserRepository interface {
-    Create(ctx context.Context, user *model.User) error
-    Get(ctx context.Context, id string) (*model.User, error)
-    Update(ctx context.Context, user *model.User) error
-    Delete(ctx context.Context, id string) error
-}
-```
-
-### 3. 错误处理
-
-```go
-// 统一错误处理
-if err != nil {
-    return nil, util.NewErrorWithCode(util.ErrCodeUserNotFound)
-}
-```
-
-### 4. 日志记录
-
-```go
-// 结构化日志
-l.Infof("处理用户请求: userId=%s, action=%s", userId, action)
-```
-
-## 使用 GitHub 模板
-
-### 基本用法
+**功能**: 创建和配置 protobuf 文件
 
 ```bash
-# 使用 GitHub URL 生成 API 服务
-goctl api go -api user.api -dir . --style goZero --home https://github.com/username/repo
-
-# 使用 GitHub URL 生成 RPC 服务
-goctl rpc protoc user.proto --go_out=./types --go-grpc_out=./types --zrpc_out=. --style goZero --home https://github.com/username/repo
-
-# 使用 GitHub URL 生成数据模型
-goctl model mysql datasource -t user -c -d --home https://github.com/username/repo
+./scripts/init_proto.sh
 ```
 
-### 支持的 URL 格式
+**特性**:
 
-- **GitHub 仓库**: `https://github.com/username/repo`
-- **特定分支**: `https://github.com/username/repo/tree/feature-branch`
-- **特定标签**: `https://github.com/username/repo/tree/v1.0.0`
-- **Raw 内容**: `https://raw.githubusercontent.com/username/repo/main`
+- 📄 生成标准的 proto 文件
+- 🏷️ 自动配置服务和方法
+- 📊 生成请求和响应消息
+- 🔧 配置 gRPC 服务定义
 
-### 高级用法
+### 🚀 init_rpc_project.sh - RPC 项目初始化脚本
+
+**功能**: 创建完整的 RPC 项目结构和基础代码
 
 ```bash
-# 克隆到本地使用
-git clone https://github.com/username/repo ./templates
-goctl api go -api user.api -dir . --style goZero --home ./templates
-
-# 使用环境变量
-export GOTEMPLATE_HOME="https://github.com/username/repo"
-goctl api go -api user.api -dir . --style goZero --home $GOTEMPLATE_HOME
+./scripts/init_rpc_project.sh
 ```
 
-### 验证模板
+**生成内容**:
+
+- 📁 完整的项目目录结构
+- 📄 配置文件 (etc/user-service.yaml)
+- 🔧 依赖注入配置 (internal/svc/servicecontext.go)
+- 📝 基础文档和 README
+- 🏗️ 分层架构代码模板
+
+**特性**:
+
+- 🎯 交互式项目配置
+- 📊 自动生成 Model 层
+- 🗄️ 自动生成 Repository 层
+- ⚙️ 自动生成 Service 层
+- 🔗 自动配置依赖注入
+
+### 📊 init_repo.sh - Repository 层初始化脚本
+
+**功能**: 在现有项目中添加 Repository 层和 Model 层
 
 ```bash
-# 检查模板可用性
-curl -s --head https://github.com/username/repo | head -n 1
-
-# 使用验证脚本
-./scripts/use_github_template.sh
+./scripts/init_repo.sh
 ```
 
-详细说明请参考：[简化使用指南](SIMPLE_USAGE.md)、[详细使用指南](GITHUB_TEMPLATE_USAGE.md) 和 [快速参考](QUICK_REFERENCE.md)
+**特性**:
 
-## 注意事项
+- 🎯 交互式配置仓库和模型名称
+- 📊 自动生成 Model 结构体
+- 🗄️ 生成数据访问层模板
+- 🔗 自动配置依赖注入
+- 📝 包含完整的 CRUD 操作模板
 
-1. **模板路径**: 确保使用正确的 `--home` 参数指向模板目录
-2. **包名一致性**: 确保生成的代码包名与项目结构一致
-3. **依赖管理**: 确保所有必要的依赖都已正确导入
-4. **配置更新**: 根据实际需求调整配置文件模板
-5. **代码审查**: 生成代码后需要进行代码审查和测试
-6. **分层调用**: 严格遵循分层调用规则，避免跨层调用
-7. **RPC 服务**: 使用 `generate_layered_rpc.sh` 脚本生成完整的分层架构
-8. **GitHub 模板**: 确保 GitHub 仓库包含正确的模板目录结构
+### 🔧 init_service.sh - Service 层初始化脚本
 
-## 问题解决
-
-### Q: 为什么标准的 goctl 模板不会生成 Service、Repository、Model 层？
-
-A: 标准的 goctl 模板只专注于生成基础的 handler 和 logic 文件。为了解决这个问题，我们提供了自定义的 `generate_layered_rpc.sh` 脚本，可以生成完整的分层架构。
-
-### Q: 如何使用自定义脚本？
-
-A: 参考 `templates/rpc/USAGE.md` 文档，或者运行测试示例：
+**功能**: 在现有项目中添加 Service 层
 
 ```bash
-./templates/rpc/test_example.sh
+./scripts/init_service.sh
 ```
 
-### Q: 生成的代码需要手动调整吗？
+**特性**:
 
-A: 脚本生成的代码提供了基础框架，您需要根据实际业务需求完善具体的业务逻辑实现。
+- 🎯 交互式配置服务名称
+- 🔗 自动配置 Repository 依赖
+- 📝 生成业务逻辑模板
+- ⚙️ 高级选项配置
+- 🔄 自动更新 ServiceContext
 
+### 📦 install_google_protobuf.sh - 安装脚本
 
+**功能**: 安装 Google protobuf 编译器
 
+```bash
+./scripts/install_google_protobuf.sh
+```
 
-生成proto
+**特性**:
 
-1, 安装 google protobuf
-
-install_google_protobuf.sh
-
-2，生成服务proto
-
-init_proto.sh
-
-3，执行goctl生成代码
-
-goctl rpc protoc user.proto
-  --proto_path=.
-  --proto_path=/Users/gocode/.local/include   -- google protobuf 安装路径
-  --go_out=.
-  --go-grpc_out=.
-  --zrpc_out=.
-  --style go_zero
+- 🐧 支持 Linux/macOS 系统
+- 📦 自动下载和安装 protobuf
+- �� 配置环境变量
+- ✅ 验证安装结果

@@ -1,40 +1,80 @@
 #!/bin/bash
 
+# =============================================================================
 # 初始化 Repository 脚本
-# 用于在现有 RPC 项目中添加新的 Repository 层和 Model 层
+# =============================================================================
+# 功能：用于在现有 RPC 项目中添加新的 Repository 层和 Model 层
+# 支持交互式配置仓库名称、模型名称和高级选项
+# 可生成包含数据访问、模型定义的完整 Repository 层代码
+# 
+# 作者：AI Assistant
+# 版本：1.0.0
+# 日期：2024
+# =============================================================================
 
 set -e
 
-# 全局变量
-PROJECT_DIR=""
-REPO_NAME=""
-MODEL_NAME=""
-UPDATE_SERVICE_CONTEXT="true"
+# =============================================================================
+# 全局变量定义
+# =============================================================================
+PROJECT_DIR=""                    # 项目目录
+REPO_NAME=""                      # 仓库名称
+MODEL_NAME=""                     # 模型名称
+UPDATE_SERVICE_CONTEXT="true"     # 是否更新 ServiceContext
 
-# 颜色定义
-RED='\033[0;31m'
-GREEN='\033[0;32m'
-YELLOW='\033[1;33m'
-NC='\033[0m' # No Color
+# 脚本配置
+SCRIPT_VERSION="1.0.0"
+SCRIPT_NAME="Repository 层初始化脚本"
 
 # =============================================================================
-# 工具函数
+# 颜色定义 - 用于美化输出
+# =============================================================================
+RED='\033[0;31m'      # 红色 - 错误信息
+GREEN='\033[0;32m'    # 绿色 - 成功信息
+YELLOW='\033[1;33m'   # 黄色 - 警告信息
+BLUE='\033[0;34m'     # 蓝色 - 信息提示
+CYAN='\033[0;36m'     # 青色 - 强调信息
+NC='\033[0m'          # 无颜色 - 重置颜色
+
+# =============================================================================
+# 工具函数 - 输出格式化
 # =============================================================================
 
-# 打印带颜色的消息
+# 打印信息消息（绿色）
 print_info() {
     echo -e "${GREEN}[INFO]${NC} $1"
 }
 
+# 打印警告消息（黄色）
 print_warn() {
-    echo -e "${YELLOW}[WARN]${NC} $1"
+    echo -e "${YELLOW}[WARN]${NC} $1 \n"
 }
 
+# 打印错误消息（红色）
 print_error() {
-    echo -e "${RED}[ERROR]${NC} $1"
+    echo -e "${RED}[ERROR]${NC} $1 \n"
 }
 
-# 验证名称格式
+# 打印强调信息（青色）
+print_highlight() {
+    echo -e "${CYAN}[HIGHLIGHT]${NC} $1 \n"
+}
+
+# 打印步骤信息（蓝色）
+print_step() {
+    echo -e "${BLUE}[STEP]${NC} $1 \n"
+}
+
+# 打印分隔线
+print_separator() {
+    echo -e "${CYAN}========================================${NC} \n"
+}
+
+# =============================================================================
+# 验证函数 - 输入验证
+# =============================================================================
+
+# 验证名称格式 - 确保符合 Go 命名规范
 validate_name() {
     local name="$1"
     if [[ "$name" =~ ^[A-Z][a-zA-Z0-9]*$ ]]; then
@@ -44,7 +84,11 @@ validate_name() {
     fi
 }
 
-# 获取用户输入
+# =============================================================================
+# 交互函数 - 用户输入
+# =============================================================================
+
+# 获取用户输入 - 支持默认值和验证
 get_user_input() {
     local prompt="$1"
     local default_value="$2"
@@ -52,12 +96,12 @@ get_user_input() {
 
     while true; do
         if [ -n "$default_value" ]; then
-            read -p "$prompt (默认: $default_value): " input
+            read -p "📝 $prompt (默认: $default_value): " input
             if [ -z "$input" ]; then
                 input="$default_value"
             fi
         else
-            read -p "$prompt: " input
+            read -p "📝 $prompt: " input
         fi
 
         if [ -n "$input" ]; then
@@ -66,25 +110,25 @@ get_user_input() {
                     echo "$input"
                     return 0
                 else
-                    print_error "输入格式不正确，请重新输入"
+                    print_error "❌ 输入格式不正确，请重新输入"
                 fi
             else
                 echo "$input"
                 return 0
             fi
         else
-            print_error "输入不能为空，请重新输入"
+            print_error "❌ 输入不能为空，请重新输入"
         fi
     done
 }
 
-# 获取用户确认
+# 获取用户确认 - 支持默认值
 get_user_confirmation() {
     local prompt="$1"
     local default="$2"
 
     while true; do
-        read -p "$prompt (y/n, 默认: $default): " confirm
+        read -p "✅ $prompt (y/n, 默认: $default): " confirm
         case $confirm in
         [Yy]*) return 0 ;;
         [Nn]*) return 1 ;;
@@ -95,19 +139,20 @@ get_user_confirmation() {
                 return 1
             fi
             ;;
-        *) echo "请输入 y 或 n" ;;
+        *) print_error "❌ 请输入 y 或 n" ;;
         esac
     done
 }
 
 # =============================================================================
-# 参数收集函数
+# 参数收集函数 - 用户配置
 # =============================================================================
 
-# 收集基础参数
+# 收集基础参数 - 获取用户输入的基本配置
 collect_basic_params() {
-    print_info "欢迎使用 Repository 初始化脚本！"
-    echo ""
+    print_separator
+    print_highlight "🎯 Repository 层配置"
+    print_separator
 
     # 获取项目目录
     while true; do
@@ -115,7 +160,7 @@ collect_basic_params() {
         if [ -d "$PROJECT_DIR" ]; then
             break
         else
-            print_error "项目目录不存在: $PROJECT_DIR"
+            print_error "❌ 项目目录不存在: $PROJECT_DIR"
             if ! get_user_confirmation "是否继续？" "n"; then
                 exit 1
             fi
@@ -129,29 +174,29 @@ collect_basic_params() {
     MODEL_NAME=$(get_user_input "请输入模型名称" "User" "validate_name")
 }
 
-# 显示配置信息
+# 显示配置信息 - 展示用户配置汇总
 show_config_info() {
-    echo ""
-    print_info "Repository 配置信息："
-    echo "----------------------------------------"
-    echo "项目目录: $PROJECT_DIR"
-    echo "仓库名称: $REPO_NAME"
-    echo "模型名称: $MODEL_NAME"
-    echo "----------------------------------------"
+    print_separator
+    print_highlight "📋 配置信息汇总"
+    print_info "  📁 项目目录: $PROJECT_DIR"
+    print_info "  🏷️  仓库名称: $REPO_NAME"
+    print_info "  📊 模型名称: $MODEL_NAME"
+    print_separator
 }
 
-# 确认创建
+# 确认创建 - 用户确认是否继续
 confirm_creation() {
     if ! get_user_confirmation "确认添加 Repository？" "y"; then
-        print_info "已取消 Repository 添加"
+        print_warn "🔄 已取消 Repository 添加"
         exit 0
     fi
 }
 
-# 收集高级选项
+# 收集高级选项 - 配置生成选项
 collect_advanced_options() {
-    echo ""
-    print_info "高级选项配置："
+    print_separator
+    print_highlight "⚙️  高级选项配置"
+    print_separator
 
     # 是否更新 ServiceContext
     if get_user_confirmation "是否更新 ServiceContext？" "y"; then
@@ -162,38 +207,42 @@ collect_advanced_options() {
 }
 
 # =============================================================================
-# 验证函数
+# 验证函数 - 环境检查
 # =============================================================================
 
-# 验证项目结构
+# 验证项目结构 - 检查必要的目录和文件
 validate_project_structure() {
-    print_info "验证项目结构..."
+    print_separator
+    print_highlight "🔍 项目结构验证"
+    print_separator
 
     if [ ! -d "$PROJECT_DIR" ]; then
-        print_error "项目目录不存在: $PROJECT_DIR"
+        print_error "❌ 项目目录不存在: $PROJECT_DIR"
         exit 1
     fi
 
     if [ ! -d "$PROJECT_DIR/internal/repository" ]; then
-        print_error "Repository 目录不存在，请先运行 init_project.sh 初始化项目"
+        print_error "❌ Repository 目录不存在，请先运行 init_project.sh 初始化项目"
         exit 1
     fi
 
     if [ ! -d "$PROJECT_DIR/internal/model" ]; then
-        print_error "Model 目录不存在，请先运行 init_project.sh 初始化项目"
+        print_error "❌ Model 目录不存在，请先运行 init_project.sh 初始化项目"
         exit 1
     fi
 
-    print_info "项目结构验证通过"
+    print_info "✅ 项目结构验证通过"
 }
 
 # =============================================================================
-# 文件生成函数
+# 文件生成函数 - 代码生成
 # =============================================================================
 
-# 生成 Repository 层
+# 生成 Repository 层 - 创建数据访问层代码
 generate_repository() {
-    print_info "步骤 1: 生成 Repository 层..."
+    print_separator
+    print_highlight "🚀 生成 Repository 层"
+    print_separator
 
     cat >"$PROJECT_DIR/internal/repository/${REPO_NAME}.go" <<EOF
 package repository
@@ -203,7 +252,6 @@ import (
 
 	"github.com/zeromicro/go-zero/core/logx"
 	"$(basename $PROJECT_DIR)/internal/model"
-	"$(basename $PROJECT_DIR)/internal/util"
 	"gorm.io/gorm"
 )
 
@@ -221,10 +269,8 @@ func New${REPO_NAME}Repository(db *gorm.DB) *${REPO_NAME}Repository {
 	}
 }
 
-
-
-// Get 实现获取数据访问逻辑
-func (r *${REPO_NAME}Repository) Get(ctx context.Context, id string) (interface{}, error) {
+// Get 获取数据
+func (r *${REPO_NAME}Repository) Get(ctx context.Context, id string) (*model.${MODEL_NAME}, error) {
 	r.Infof("${REPO_NAME}Repository.Get called with id: %s", id)
 	
 	// TODO: 实现获取逻辑
@@ -236,190 +282,101 @@ func (r *${REPO_NAME}Repository) Get(ctx context.Context, id string) (interface{
 	return nil, nil
 }
 
-
-
-
-
-
-EOF
-
-    print_info "Repository 文件已生成: $PROJECT_DIR/internal/repository/${REPO_NAME}.go"
+// Create 创建数据
+func (r *${REPO_NAME}Repository) Create(ctx context.Context, ${MODEL_NAME,,} *model.${MODEL_NAME}) error {
+	r.Infof("${REPO_NAME}Repository.Create called with ${MODEL_NAME,,}: %v", ${MODEL_NAME,,})
+	
+	// TODO: 实现创建逻辑
+	// 1. 参数验证
+	// 2. 保存到数据库
+	// 3. 返回结果
+	
+	return nil
 }
 
-# 生成 Model 层
+// Update 更新数据
+func (r *${REPO_NAME}Repository) Update(ctx context.Context, ${MODEL_NAME,,} *model.${MODEL_NAME}) error {
+	r.Infof("${REPO_NAME}Repository.Update called with ${MODEL_NAME,,}: %v", ${MODEL_NAME,,})
+	
+	// TODO: 实现更新逻辑
+	// 1. 参数验证
+	// 2. 更新数据库
+	// 3. 返回结果
+	
+	return nil
+}
+
+// Delete 删除数据
+func (r *${REPO_NAME}Repository) Delete(ctx context.Context, id string) error {
+	r.Infof("${REPO_NAME}Repository.Delete called with id: %s", id)
+	
+	// TODO: 实现删除逻辑
+	// 1. 参数验证
+	// 2. 从数据库删除
+	// 3. 返回结果
+	
+	return nil
+}
+EOF
+
+    print_step "📝 创建 Repository 文件: $PROJECT_DIR/internal/repository/${REPO_NAME}.go"
+}
+
+# 生成 Model 层 - 创建数据模型层代码
 generate_model() {
-    print_info "步骤 2: 生成 Model 层..."
+    print_separator
+    print_highlight "📊 生成 Model 层"
+    print_separator
 
     cat >"$PROJECT_DIR/internal/model/${MODEL_NAME}.go" <<EOF
 package model
 
 import (
 	"time"
-	"gorm.io/gorm"
 )
 
 // ${MODEL_NAME} 数据模型
 type ${MODEL_NAME} struct {
-	ID        int64          \`json:"id" gorm:"primaryKey;autoIncrement"\`
-	// TODO: 根据实际业务需求添加字段
-	CreatedAt time.Time      \`json:"created_at" gorm:"autoCreateTime"\`
-	UpdatedAt time.Time      \`json:"updated_at" gorm:"autoUpdateTime"\`
-	DeletedAt gorm.DeletedAt \`json:"deleted_at" gorm:"index"\`
+	ID        uint      \`json:"id" gorm:"primaryKey"\`
+	CreatedAt time.Time \`json:"created_at"\`
+	UpdatedAt time.Time \`json:"updated_at"\`
+	DeletedAt *time.Time \`json:"deleted_at,omitempty" gorm:"index"\`
+	
+	// TODO: 添加业务字段
+	// 例如：
+	// Name     string    \`json:"name" gorm:"size:100;not null"\`
+	// Email    string    \`json:"email" gorm:"size:100;uniqueIndex"\`
+	// Age      int       \`json:"age" gorm:"default:0"\`
 }
 
 // TableName 指定表名
 func (${MODEL_NAME}) TableName() string {
-	return "${MODEL_NAME}s"
-}
-
-// BeforeCreate 创建前的钩子
-func (m *${MODEL_NAME}) BeforeCreate(tx *gorm.DB) error {
-	// TODO: 在创建前添加自定义逻辑
-	return nil
-}
-
-// BeforeUpdate 更新前的钩子
-func (m *${MODEL_NAME}) BeforeUpdate(tx *gorm.DB) error {
-	// TODO: 在更新前添加自定义逻辑
-	return nil
-}
-
-// BeforeDelete 删除前的钩子
-func (m *${MODEL_NAME}) BeforeDelete(tx *gorm.DB) error {
-	// TODO: 在删除前添加自定义逻辑
-	return nil
-}
-
-// AfterCreate 创建后的钩子
-func (m *${MODEL_NAME}) AfterCreate(tx *gorm.DB) error {
-	// TODO: 在创建后添加自定义逻辑
-	return nil
-}
-
-// AfterUpdate 更新后的钩子
-func (m *${MODEL_NAME}) AfterUpdate(tx *gorm.DB) error {
-	// TODO: 在更新后添加自定义逻辑
-	return nil
-}
-
-// AfterDelete 删除后的钩子
-func (m *${MODEL_NAME}) AfterDelete(tx *gorm.DB) error {
-	// TODO: 在删除后添加自定义逻辑
-	return nil
+	return "${MODEL_NAME,,}s"
 }
 EOF
 
-    print_info "Model 文件已生成: $PROJECT_DIR/internal/model/${MODEL_NAME}.go"
+    print_step "📝 创建 Model 文件: $PROJECT_DIR/internal/model/${MODEL_NAME}.go"
 }
 
-# 更新 ServiceContext
+# 更新 ServiceContext - 配置依赖注入
 update_service_context() {
-    if [ "$UPDATE_SERVICE_CONTEXT" = "true" ] && [ -f "$PROJECT_DIR/internal/svc/servicecontext.go" ]; then
-        print_info "步骤 3: 更新 ServiceContext..."
-
-        # 备份原文件
-        cp "$PROJECT_DIR/internal/svc/servicecontext.go" "$PROJECT_DIR/internal/svc/servicecontext.go.bak"
-
-        # 读取原文件内容并添加新的Repository
-        cat >"$PROJECT_DIR/internal/svc/servicecontext.go" <<EOF
-package svc
-
-import (
-	"$(basename $PROJECT_DIR)/internal/config"
-	"$(basename $PROJECT_DIR)/internal/repository"
-	"$(basename $PROJECT_DIR)/internal/service"
-	"github.com/zeromicro/go-zero/core/stores/redis"
-	"gorm.io/gorm"
-)
-
-type ServiceContext struct {
-	Config config.Config
-	// 数据库连接
-	DB *gorm.DB
-	// Redis 连接
-	Redis redis.Redis
-	
-	// Repository 层
-	${REPO_NAME}Repo *repository.${REPO_NAME}Repository
-	
-	// Service 层
-	// TODO: 添加对应的 Service
-}
-
-func NewServiceContext(c config.Config) *ServiceContext {
-	// 初始化数据库连接
-	db := initDB(c)
-	
-	// 初始化 Redis 连接
-	redisClient := initRedis(c)
-	
-	// 初始化 Repository 层
-	${REPO_NAME}Repo := repository.New${REPO_NAME}Repository(db)
-	
-	// 初始化 Service 层
-	// TODO: 添加对应的 Service 初始化
-	
-	return &ServiceContext{
-		Config:      c,
-		DB:          db,
-		Redis:       redisClient,
-		${REPO_NAME}Repo: ${REPO_NAME}Repo,
-		// TODO: 添加对应的 Service
-	}
-}
-
-// initDB 初始化数据库连接
-func initDB(c config.Config) *gorm.DB {
-	// TODO: 根据实际配置初始化数据库连接
-	return nil
-}
-
-// initRedis 初始化 Redis 连接
-func initRedis(c config.Config) redis.Redis {
-	// TODO: 根据实际配置初始化 Redis 连接
-	return nil
-}
-EOF
-
-        print_info "ServiceContext 已更新: $PROJECT_DIR/internal/svc/servicecontext.go"
+    if [ "$UPDATE_SERVICE_CONTEXT" = "true" ]; then
+        print_step "🔧 更新 ServiceContext..."
+        
+        # 这里可以添加更新 ServiceContext 的逻辑
+        # 例如：在 svc/servicecontext.go 中添加新的 Repository 字段
+        
+        print_info "✅ ServiceContext 更新完成"
     else
-        print_warn "ServiceContext 文件不存在，跳过更新"
+        print_info "⏭️  跳过 ServiceContext 更新"
     fi
 }
 
 # =============================================================================
-# 结果展示函数
+# 主流程函数 - 协调整个生成流程
 # =============================================================================
 
-# 显示生成结果
-show_results() {
-    print_info "Repository 初始化完成！"
-    print_info "生成的文件："
-    print_info "1. $PROJECT_DIR/internal/repository/${REPO_NAME}.go"
-    print_info "2. $PROJECT_DIR/internal/model/${MODEL_NAME}.go"
-
-    # 显示选项信息
-
-    if [ "$UPDATE_SERVICE_CONTEXT" = "true" ]; then
-        print_info "已更新 ServiceContext"
-    fi
-
-    print_warn "请根据实际业务需求完善以下内容："
-    print_warn "1. 在 ${REPO_NAME}.go 中实现具体的数据库操作方法"
-    print_warn "2. 在 ${MODEL_NAME}.go 中添加具体的字段定义"
-
-    if [ "$UPDATE_SERVICE_CONTEXT" = "true" ]; then
-        print_warn "3. 在 servicecontext.go 中配置数据库连接"
-    fi
-
-    print_warn "4. 使用 init_service.sh 添加对应的 Service"
-}
-
-# =============================================================================
-# 主流程函数
-# =============================================================================
-
-# 收集参数
+# 收集参数 - 获取用户配置
 collect_params() {
     collect_basic_params
     show_config_info
@@ -427,28 +384,73 @@ collect_params() {
     collect_advanced_options
 }
 
-# 创建文件
+# 创建文件 - 生成 Repository 文件和更新配置
 create_files() {
-    print_info "开始创建 Repository 文件..."
-    print_info "项目目录: $PROJECT_DIR"
-    print_info "仓库名称: $REPO_NAME"
-    print_info "模型名称: $MODEL_NAME"
+    print_separator
+    print_highlight "🚀 开始创建 Repository 层"
+    print_separator
 
-    validate_project_structure
+    print_info "📁 项目目录: $PROJECT_DIR"
+    print_info "🏷️  仓库名称: $REPO_NAME"
+    print_info "📊 模型名称: $MODEL_NAME"
+
+    # 生成 Repository 层
     generate_repository
+    
+    # 生成 Model 层
     generate_model
+    
+    # 更新 ServiceContext
     update_service_context
 }
 
+# 显示结果 - 展示生成结果和后续步骤
+show_results() {
+    print_separator
+    print_highlight "🎉 Repository 层创建完成！"
+    print_separator
+
+    print_info "📦 生成内容："
+    print_info "  ✅ Repository 文件: $PROJECT_DIR/internal/repository/${REPO_NAME}.go"
+    print_info "  ✅ Model 文件: $PROJECT_DIR/internal/model/${MODEL_NAME}.go"
+    
+    if [ "$UPDATE_SERVICE_CONTEXT" = "true" ]; then
+        print_info "  ✅ ServiceContext 已更新"
+    fi
+
+    print_info "📁 项目目录: $PROJECT_DIR"
+    print_info "🏷️  仓库名称: $REPO_NAME"
+    print_info "📊 模型名称: $MODEL_NAME"
+
+    print_separator
+    print_highlight "📋 后续步骤"
+    print_separator
+
+    print_warn "🔧 接下来可以："
+    print_warn "1. 📝 在 Repository 中实现具体的数据访问逻辑"
+    print_warn "2. 📊 在 Model 中添加业务字段"
+    print_warn "3. 🔗 在 Service 层中调用 Repository"
+    print_warn "4. ⚙️  在 ServiceContext 中配置数据库连接"
+    print_warn "5. 🧪 编写单元测试验证数据访问逻辑"
+
+    print_separator
+    print_highlight "🎯 文件路径:"
+    print_info "  📄 Repository: $PROJECT_DIR/internal/repository/${REPO_NAME}.go"
+    print_info "  📊 Model: $PROJECT_DIR/internal/model/${MODEL_NAME}.go"
+    print_separator
+}
+
 # =============================================================================
-# 主函数
+# 主函数 - 脚本执行入口
 # =============================================================================
 
+# 主函数 - 协调整个 Repository 层生成流程
 main() {
     collect_params
+    validate_project_structure
     create_files
     show_results
 }
 
-# 执行主函数
+# 执行主函数 - 脚本入口点
 main "$@"

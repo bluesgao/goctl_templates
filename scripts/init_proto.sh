@@ -1,44 +1,80 @@
 #!/bin/bash
 
+# =============================================================================
 # 初始化 Proto 文件脚本
-# 用于创建基础的 proto 文件
+# =============================================================================
+# 功能：用于创建基础的 proto 文件
+# 支持交互式配置服务名称、输出目录和高级选项
+# 可生成包含通用消息、服务方法、注释的完整 proto 文件
+# 
+# 作者：AI Assistant
+# 版本：1.0.0
+# 日期：2024
+# =============================================================================
 
 set -e
 
-# 全局变量
-OUTPUT_DIR=""
-SERVICE_NAME=""
-PROTO_FILE=""
-GO_PACKAGE_PATH=""
-INCLUDE_COMMON_MESSAGES="true"
-INCLUDE_SERVICE_METHODS="true"
-INCLUDE_COMMENTS="true"
-INCLUDE_IMPORTS="true"
+# =============================================================================
+# 全局变量定义
+# =============================================================================
+OUTPUT_DIR=""                    # 输出目录
+SERVICE_NAME=""                  # 服务名称
+PROTO_FILE=""                    # Proto 文件名
+GO_PACKAGE_PATH=""              # Go Package 路径
+INCLUDE_COMMON_MESSAGES="true"   # 是否包含通用消息
+INCLUDE_SERVICE_METHODS="true"   # 是否包含服务方法
+INCLUDE_COMMENTS="true"          # 是否包含注释
+INCLUDE_IMPORTS="true"          # 是否包含导入语句
 
-# 颜色定义
-RED='\033[0;31m'
-GREEN='\033[0;32m'
-YELLOW='\033[1;33m'
-NC='\033[0m' # No Color
+# 脚本配置
+SCRIPT_VERSION="1.0.0"
+SCRIPT_NAME="Proto 文件生成脚本"
 
 # =============================================================================
-# 工具函数
+# 颜色定义 - 用于美化输出
+# =============================================================================
+RED='\033[0;31m'      # 红色 - 错误信息
+GREEN='\033[0;32m'    # 绿色 - 成功信息
+YELLOW='\033[1;33m'   # 黄色 - 警告信息
+BLUE='\033[0;34m'     # 蓝色 - 信息提示
+CYAN='\033[0;36m'     # 青色 - 强调信息
+NC='\033[0m'          # 无颜色 - 重置颜色
+
+# =============================================================================
+# 工具函数 - 输出格式化
 # =============================================================================
 
-# 打印带颜色的消息
+# 打印信息消息（绿色）
 print_info() {
     echo -e "${GREEN}[INFO]${NC} $1"
 }
 
+# 打印警告消息（黄色）
 print_warn() {
-    echo -e "${YELLOW}[WARN]${NC} $1"
+    echo -e "${YELLOW}[WARN]${NC} $1 \n"
 }
 
+# 打印错误消息（红色）
 print_error() {
-    echo -e "${RED}[ERROR]${NC} $1"
+    echo -e "${RED}[ERROR]${NC} $1 \n"
 }
 
-# 验证服务名称格式
+# 打印强调信息（青色）
+print_highlight() {
+    echo -e "${CYAN}[HIGHLIGHT]${NC} $1 \n"
+}
+
+# 打印步骤信息（蓝色）
+print_step() {
+    echo -e "${BLUE}[STEP]${NC} $1 \n"
+}
+
+# 打印分隔线
+print_separator() {
+    echo -e "${CYAN}========================================${NC} \n"
+}
+
+# 验证服务名称格式 - 确保符合 proto 命名规范
 validate_service_name() {
     local name="$1"
     if [[ "$name" =~ ^[a-zA-Z][a-zA-Z0-9]*$ ]]; then
@@ -48,7 +84,7 @@ validate_service_name() {
     fi
 }
 
-# 获取用户输入
+# 获取用户输入 - 支持默认值和验证
 get_user_input() {
     local prompt="$1"
     local default_value="$2"
@@ -56,12 +92,12 @@ get_user_input() {
     
     while true; do
         if [ -n "$default_value" ]; then
-            read -p "$prompt (默认: $default_value): " input
+            read -p "📝 $prompt (默认: $default_value): " input
             if [ -z "$input" ]; then
                 input="$default_value"
             fi
         else
-            read -p "$prompt: " input
+            read -p "📝 $prompt: " input
         fi
         
         if [ -n "$input" ]; then
@@ -70,25 +106,25 @@ get_user_input() {
                     echo "$input"
                     return 0
                 else
-                    print_error "输入格式不正确，请重新输入"
+                    print_error "❌ 输入格式不正确，请重新输入"
                 fi
             else
                 echo "$input"
                 return 0
             fi
         else
-            print_error "输入不能为空，请重新输入"
+            print_error "❌ 输入不能为空，请重新输入"
         fi
     done
 }
 
-# 获取用户确认
+# 获取用户确认 - 支持默认值
 get_user_confirmation() {
     local prompt="$1"
     local default="$2"
     
     while true; do
-        read -p "$prompt (y/n, 默认: $default): " confirm
+        read -p "✅ $prompt (y/n, 默认: $default): " confirm
         case $confirm in
             [Yy]* ) return 0;;
             [Nn]* ) return 1;;
@@ -99,57 +135,70 @@ get_user_confirmation() {
                     return 1
                 fi
                 ;;
-            * ) echo "请输入 y 或 n";;
+            * ) print_error "❌ 请输入 y 或 n";;
         esac
     done
 }
 
 # =============================================================================
-# 参数收集函数
+# 参数收集函数 - 用户配置
 # =============================================================================
 
-# 收集基础参数
+# 收集基础参数 - 获取用户输入的基本配置
 collect_basic_params() {
-    print_info "欢迎使用 Proto 文件生成脚本！"
-    echo ""
+    print_separator
+    print_highlight "🎯 Proto 文件配置"
+    print_separator
     
-    # 获取输出目录
-    OUTPUT_DIR=$(get_user_input "请输入输出目录" "./proto")
+    # 获取输出目录（必填）
+    OUTPUT_DIR=$(get_user_input "请输入输出目录（必填）" "" "")
     
-    # 获取服务名称
-    SERVICE_NAME=$(get_user_input "请输入服务名称" "user" "validate_service_name")
+    # 从输出目录提取默认服务名称
+    local default_service_name=$(basename "$OUTPUT_DIR")
+    if [ "$default_service_name" = "." ] || [ "$default_service_name" = ".." ]; then
+        default_service_name="user"
+    fi
+    
+    # 验证输出目录不为空
+    if [ -z "$OUTPUT_DIR" ]; then
+        print_error "❌ 输出目录不能为空"
+        exit 1
+    fi
+    
+    # 获取服务名称，默认使用目录名
+    SERVICE_NAME=$(get_user_input "请输入服务名称" "$default_service_name" "validate_service_name")
     
     # 获取 proto 文件名
     PROTO_FILE=$(get_user_input "请输入 proto 文件名" "${SERVICE_NAME}.proto")
     
     # 获取 go_package 路径
-    GO_PACKAGE_PATH=$(get_user_input "请输入 go_package 路径" "github.com/example/${SERVICE_NAME}/types")
+    GO_PACKAGE_PATH=$(get_user_input "请输入 go_package 路径" "./types")
 }
 
-# 显示配置信息
+# 显示配置信息 - 展示用户配置汇总
 show_config_info() {
-    echo ""
-    print_info "Proto 文件配置信息："
-    echo "----------------------------------------"
-    echo "输出目录: $OUTPUT_DIR"
-    echo "服务名称: $SERVICE_NAME"
-    echo "Proto 文件: $PROTO_FILE"
-    echo "Go Package: $GO_PACKAGE_PATH"
-    echo "----------------------------------------"
+    print_separator
+    print_highlight "📋 配置信息汇总"
+    print_info "  📁 输出目录: $OUTPUT_DIR"
+    print_info "  🏷️  服务名称: $SERVICE_NAME"
+    print_info "  📄 Proto 文件: $PROTO_FILE"
+    print_info "  📦 Go Package: $GO_PACKAGE_PATH"
+    print_separator
 }
 
-# 确认创建
+# 确认创建 - 用户确认是否继续
 confirm_creation() {
     if ! get_user_confirmation "确认创建 Proto 文件？" "y"; then
-        print_info "已取消 Proto 文件创建"
+        print_warn "🔄 已取消 Proto 文件创建"
         exit 0
     fi
 }
 
-# 收集高级选项
+# 收集高级选项 - 配置生成选项
 collect_advanced_options() {
-    echo ""
-    print_info "高级选项配置："
+    print_separator
+    print_highlight "⚙️  高级选项配置"
+    print_separator
     
     # 是否包含通用消息
     if get_user_confirmation "是否包含通用消息 (Result, PageRequest 等)？" "y"; then
@@ -173,7 +222,7 @@ collect_advanced_options() {
     fi
     
     # 是否包含导入语句
-    if get_user_confirmation "是否包含常用导入语句？" "y"; then
+    if get_user_confirmation "是否包含常用导入语句（google protobuf 定义）？" "y"; then
         INCLUDE_IMPORTS="true"
     else
         INCLUDE_IMPORTS="false"
@@ -181,10 +230,10 @@ collect_advanced_options() {
 }
 
 # =============================================================================
-# 内容处理函数
+# 内容处理函数 - 生成内容
 # =============================================================================
 
-# 处理导入语句
+# 处理导入语句 - 根据用户选择生成导入语句
 handle_imports() {
     local imports=""
     
@@ -198,10 +247,10 @@ import \"google/protobuf/empty.proto\";
 }
 
 # =============================================================================
-# 内容生成函数
+# 内容生成函数 - 生成 proto 内容
 # =============================================================================
 
-# 生成通用消息
+# 生成通用消息 - 根据用户选择生成通用消息定义
 generate_common_messages() {
     if [ "$INCLUDE_COMMON_MESSAGES" = "true" ]; then
         cat << 'EOF'
@@ -243,7 +292,7 @@ EOF
     fi
 }
 
-# 生成服务方法
+# 生成服务方法 - 根据用户选择生成服务方法定义
 generate_service_methods() {
     if [ "$INCLUDE_SERVICE_METHODS" = "true" ]; then
         cat << 'EOF'
@@ -256,7 +305,7 @@ EOF
     fi
 }
 
-# 生成请求响应消息
+# 生成请求响应消息 - 根据用户选择生成请求响应消息定义
 generate_request_response_messages() {
     if [ "$INCLUDE_SERVICE_METHODS" = "true" ]; then
         # 根据用户选择决定时间戳格式
@@ -287,7 +336,7 @@ EOF
     fi
 }
 
-# 生成注释
+# 生成注释 - 根据用户选择生成文件注释
 generate_comments() {
     if [ "$INCLUDE_COMMENTS" = "true" ]; then
         cat << EOF
@@ -302,6 +351,7 @@ generate_comments() {
  * 文件路径: ${OUTPUT_DIR}/${PROTO_FILE}
  */
 
+
 EOF
     else
         # 返回空字符串，避免语法错误
@@ -309,7 +359,7 @@ EOF
     fi
 }
 
-# 生成 proto 文件
+# 生成 proto 文件 - 组合所有内容生成最终的 proto 文件
 generate_proto_file() {
     local imports="$1"
     local common_messages="$2"
@@ -340,10 +390,10 @@ EOF
 }
 
 # =============================================================================
-# 文档生成函数
+# 文档生成函数 - 生成说明文档
 # =============================================================================
 
-# 生成 README 文档
+# 生成 README 文档 - 根据用户选择生成说明文档
 generate_readme() {
     if [ "$INCLUDE_COMMENTS" = "true" ]; then
         cat > "$OUTPUT_DIR/README.md" << EOF
@@ -411,10 +461,10 @@ EOF
 
 
 # =============================================================================
-# 主流程函数
+# 主流程函数 - 协调整个生成流程
 # =============================================================================
 
-# 收集参数
+# 收集参数 - 获取用户配置
 collect_params() {
     collect_basic_params
     show_config_info
@@ -422,18 +472,22 @@ collect_params() {
     collect_advanced_options
 }
 
-# 创建文件
+# 创建文件 - 生成 proto 文件和文档
 create_files() {
-    print_info "开始创建 Proto 文件..."
-    print_info "输出目录: $OUTPUT_DIR"
-    print_info "服务名称: $SERVICE_NAME"
-    print_info "Proto 文件: $PROTO_FILE"
+    print_separator
+    print_highlight "🚀 开始创建 Proto 文件"
+    print_separator
+    
+    print_info "📁 输出目录: $OUTPUT_DIR"
+    print_info "🏷️  服务名称: $SERVICE_NAME"
+    print_info "📄 Proto 文件: $PROTO_FILE"
 
     # 创建输出目录
+    print_step "📁 创建输出目录: $OUTPUT_DIR"
     mkdir -p "$OUTPUT_DIR"
 
     # 生成 proto 文件
-    print_info "步骤 1: 生成 Proto 文件..."
+    print_step "📝 生成 Proto 文件..."
     
     local imports=$(handle_imports)
     local common_messages=$(generate_common_messages)
@@ -443,54 +497,68 @@ create_files() {
     
     generate_proto_file "$imports" "$common_messages" "$service_methods" "$request_response_messages" "$comments"
     
-    print_info "Proto 文件已生成: $OUTPUT_DIR/$PROTO_FILE"
+    print_info "✅ Proto 文件已生成: $OUTPUT_DIR/$PROTO_FILE"
 }
 
-# 生成文档
+# 生成文档 - 生成说明文档
 generate_documents() {
     # 生成 README 文档
     if [ "$INCLUDE_COMMENTS" = "true" ]; then
-        print_info "步骤 2: 生成 README 文档..."
+        print_step "📚 生成 README 文档..."
         generate_readme
-        print_info "README 文档已生成: $OUTPUT_DIR/README.md"
+        print_info "✅ README 文档已生成: $OUTPUT_DIR/README.md"
     fi
 }
 
-# 显示结果
+# 显示结果 - 展示生成结果和后续步骤
 show_results() {
+    print_separator
+    print_highlight "🎉 Proto 文件创建完成！"
+    print_separator
+    
+    print_info "📦 生成内容："
+    
     # 根据用户选择显示不同的信息
     if [ "$INCLUDE_COMMON_MESSAGES" = "true" ]; then
-        print_info "已包含通用消息定义"
+        print_info "  ✅ 已包含通用消息定义"
     fi
 
     if [ "$INCLUDE_SERVICE_METHODS" = "true" ]; then
-        print_info "已包含示例服务方法"
+        print_info "  ✅ 已包含示例服务方法"
     fi
 
     if [ "$INCLUDE_COMMENTS" = "true" ]; then
-        print_info "已包含详细注释"
+        print_info "  ✅ 已包含详细注释"
     fi
 
     if [ "$INCLUDE_IMPORTS" = "true" ]; then
-        print_info "已包含常用导入语句（Google protobuf）"
+        print_info "  ✅ 已包含常用导入语句（google protobuf 定义）"
     else
-        print_info "未包含 Google protobuf 导入"
+        print_info "  ⚠️  未包含 google protobuf 定义"
     fi
 
-    print_info "Proto 文件创建完成！"
-    print_info "输出目录: $OUTPUT_DIR"
-    print_info "Proto 文件: $OUTPUT_DIR/$PROTO_FILE"
+    print_info "📁 输出目录: $OUTPUT_DIR"
+    print_info "📄 Proto 文件: $OUTPUT_DIR/$PROTO_FILE"
 
-    print_warn "接下来可以："
-print_warn "1. 根据实际业务需求修改消息定义"
-print_warn "2. 在服务中实现对应的 gRPC 方法"
-print_warn "3. 使用 protoc 或 goctl 编译 proto 文件"
+    print_separator
+    print_highlight "📋 后续步骤"
+    print_separator
+    
+    print_warn "🔧 接下来可以："
+    print_warn "1. 📝 根据实际业务需求修改消息定义"
+    print_warn "2. 🚀 在服务中实现对应的 gRPC 方法"
+    print_warn "3. ⚙️  使用 protoc 或 goctl 编译 proto 文件"
+    
+    print_separator
+    print_highlight "🎯 文件路径: $OUTPUT_DIR/$PROTO_FILE"
+    print_separator
 }
 
 # =============================================================================
-# 主函数
+# 主函数 - 脚本执行入口
 # =============================================================================
 
+# 主函数 - 协调整个 proto 文件生成流程
 main() {
     collect_params
     create_files
@@ -498,5 +566,7 @@ main() {
     show_results
 }
 
-# 执行主函数
-main "$@" 
+# 执行主函数 - 脚本入口点
+main "$@"
+
+ 
